@@ -197,7 +197,7 @@ async def mark_fixed(call: CallbackQuery, callback_data: CB):
 
 async def main():
     print("Бот «Сафонов» запущен.")
-    await dp.start_polling(bot)
+    await dp.start_polling(bot, allowed_updates=["message", "callback_query"])
 
 if __name__ == "__main__":
     asyncio.run(main())
