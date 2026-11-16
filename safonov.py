@@ -7,6 +7,7 @@ from datetime import datetime, timezone, timedelta
 from aiogram import Bot, Dispatcher, F
 from aiogram.types import Message, CallbackQuery, InlineKeyboardMarkup, InlineKeyboardButton
 from aiogram.filters import Command
+from aiogram.client.default import DefaultBotProperties
 
 # ==================== НАСТРОЙКИ ====================
 BOT_TOKEN = "9135870925:AAF2l37IPIux38HJbSZxgmwwX_rxNQkASM4"
@@ -17,7 +18,10 @@ TZ = timezone(timedelta(hours=7))  # МСК+4
 
 logging.basicConfig(level=logging.INFO)
 
-bot = Bot(token=BOT_TOKEN)
+bot = Bot(
+    token=BOT_TOKEN,
+    default=DefaultBotProperties(disable_notification=True)
+)
 dp = Dispatcher()
 
 # ---------- Хранилище ----------
