@@ -7,20 +7,15 @@ from datetime import datetime, timezone, timedelta
 from aiogram import Bot, Dispatcher, F
 from aiogram.types import Message, CallbackQuery, InlineKeyboardMarkup, InlineKeyboardButton
 from aiogram.filters import Command
-from aiogram.filters.callback_data import CallbackData
 
 # ==================== НАСТРОЙКИ ====================
-BOT_TOKEN = "9135870925:AAF2l37IPIux38HJbSZxgmwwX_rxNQkASM4"  # <-- замените на новый токен после /revoke
+BOT_TOKEN = "9135870925:AAF2l37IPIux38HJbSZxgmwwX_rxNQkASM4"
 
 DATA_FILE = "safonov_data.json"
 TZ = timezone(timedelta(hours=7))  # МСК+4
 # ===================================================
 
 logging.basicConfig(level=logging.INFO)
-
-class CB(CallbackData, prefix="saf"):
-    action: str
-    value: str = ""
 
 bot = Bot(token=BOT_TOKEN)
 dp = Dispatcher()
@@ -42,29 +37,29 @@ pending = {}
 # ---------- Клавиатуры ----------
 def main_keyboard():
     return InlineKeyboardMarkup(inline_keyboard=[
-        [InlineKeyboardButton(text="📋 Общий список", callback_data=CB(action="all").pack())],
-        [InlineKeyboardButton(text="🛒 Список покупок", callback_data=CB(action="shop").pack()),
-         InlineKeyboardButton(text="🔧 Список поломок", callback_data=CB(action="broken").pack())],
-        [InlineKeyboardButton(text="➕ Добавить покупку", callback_data=CB(action="add_shop").pack()),
-         InlineKeyboardButton(text="➕ Сообщить о поломке", callback_data=CB(action="add_broken").pack())],
+        [InlineKeyboardButton(text="📋 Общий список", callback_data="all")],
+        [InlineKeyboardButton(text="🛒 Список покупок", callback_data="shop"),
+         InlineKeyboardButton(text="🔧 Список поломок", callback_data="broken")],
+        [InlineKeyboardButton(text="➕ Добавить покупку", callback_data="add_shop"),
+         InlineKeyboardButton(text="➕ Сообщить о поломке", callback_data="add_broken")],
     ])
 
 def list_keyboard(kind):
     mark = "✅ Отметить купленное" if kind == "shop" else "✅ Отметить починенное"
     act = "mark_shop" if kind == "shop" else "mark_broken"
     return InlineKeyboardMarkup(inline_keyboard=[
-        [InlineKeyboardButton(text=mark, callback_data=CB(action=act).pack())],
-        [InlineKeyboardButton(text="⬅️ В главное меню", callback_data=CB(action="main").pack())],
+        [InlineKeyboardButton(text=mark, callback_data=act)],
+        [InlineKeyboardButton(text="⬅️ В главное меню", callback_data="main")],
     ])
 
 def mark_keyboard(kind, items):
     kb, row = [], []
     for it in items:
-        row.append(InlineKeyboardButton(text=it["name"], callback_data=CB(action=kind, value=it["name"]).pack()))
+        row.append(InlineKeyboardButton(text=it["name"], callback_data=f"{kind}:{it['name']}"))
         if len(row) == 2:
             kb.append(row); row = []
     if row: kb.append(row)
-    kb.append([InlineKeyboardButton(text="⬅️ В главное меню", callback_data=CB(action="main").pack())])
+    kb.append([InlineKeyboardButton(text="⬅️ В главное меню", callback_data="main")])
     return InlineKeyboardMarkup(inline_keyboard=kb)
 
 def main_text():
@@ -90,7 +85,7 @@ def format_list(kind):
 async def cmd_panel(message: Message):
     await message.answer(main_text(), reply_markup=main_keyboard(), parse_mode="Markdown")
 
-@dp.callback_query(CB.filter(F.action == "main"))
+@dp.callback_query(F.data == "main")
 async def go_main(call: CallbackQuery):
     try:
         await call.message.delete()
@@ -99,32 +94,32 @@ async def go_main(call: CallbackQuery):
     await call.message.answer(main_text(), reply_markup=main_keyboard(), parse_mode="Markdown")
     await call.answer()
 
-@dp.callback_query(CB.filter(F.action == "all"))
+@dp.callback_query(F.data == "all")
 async def show_all(call: CallbackQuery):
     await call.message.edit_text(format_list("all"), reply_markup=InlineKeyboardMarkup(inline_keyboard=[
-        [InlineKeyboardButton(text="✅ Отметить купленное", callback_data=CB(action="mark_shop").pack())],
-        [InlineKeyboardButton(text="✅ Отметить починенное", callback_data=CB(action="mark_broken").pack())],
-        [InlineKeyboardButton(text="⬅️ В главное меню", callback_data=CB(action="main").pack())],
+        [InlineKeyboardButton(text="✅ Отметить купленное", callback_data="mark_shop")],
+        [InlineKeyboardButton(text="✅ Отметить починенное", callback_data="mark_broken")],
+        [InlineKeyboardButton(text="⬅️ В главное меню", callback_data="main")],
     ]), parse_mode="Markdown")
     await call.answer()
 
-@dp.callback_query(CB.filter(F.action == "shop"))
+@dp.callback_query(F.data == "shop")
 async def show_shop(call: CallbackQuery):
     await call.message.edit_text(format_list("shop"), reply_markup=list_keyboard("shop"), parse_mode="Markdown")
     await call.answer()
 
-@dp.callback_query(CB.filter(F.action == "broken"))
+@dp.callback_query(F.data == "broken")
 async def show_broken(call: CallbackQuery):
     await call.message.edit_text(format_list("broken"), reply_markup=list_keyboard("broken"), parse_mode="Markdown")
     await call.answer()
 
-@dp.callback_query(CB.filter(F.action == "add_shop"))
+@dp.callback_query(F.data == "add_shop")
 async def ask_add_shop(call: CallbackQuery):
     msg = await call.message.answer("✍️ Напишите, что нужно купить, одним сообщением:")
     pending[call.from_user.id] = {"type": "shop", "prompt_msg_id": msg.message_id, "chat_id": call.message.chat.id, "panel_msg_id": call.message.message_id}
     await call.answer()
 
-@dp.callback_query(CB.filter(F.action == "add_broken"))
+@dp.callback_query(F.data == "add_broken")
 async def ask_add_broken(call: CallbackQuery):
     msg = await call.message.answer("✍️ Напишите, что сломалось, одним сообщением:")
     pending[call.from_user.id] = {"type": "broken", "prompt_msg_id": msg.message_id, "chat_id": call.message.chat.id, "panel_msg_id": call.message.message_id}
@@ -171,7 +166,7 @@ async def save_input(message: Message):
     except Exception:
         pass
 
-@dp.callback_query(CB.filter(F.action == "mark_shop"))
+@dp.callback_query(F.data == "mark_shop")
 async def ask_mark_shop(call: CallbackQuery):
     if not data["shopping"]:
         await call.answer("Список покупок пуст.", show_alert=True)
@@ -179,9 +174,9 @@ async def ask_mark_shop(call: CallbackQuery):
     await call.message.edit_text("Выберите, что куплено:", reply_markup=mark_keyboard("buy", data["shopping"]))
     await call.answer()
 
-@dp.callback_query(CB.filter(F.action == "buy"))
-async def mark_bought(call: CallbackQuery, callback_data: CB):
-    name = callback_data.value
+@dp.callback_query(F.data.startswith("buy:"))
+async def mark_bought(call: CallbackQuery):
+    name = call.data.split(":", 1)[1]
     found = next((it for it in data["shopping"] if it["name"] == name), None)
     if not found:
         await call.answer("Позиция не найдена.", show_alert=True)
@@ -198,7 +193,7 @@ async def mark_bought(call: CallbackQuery, callback_data: CB):
         pass
     await call.message.answer(main_text(), reply_markup=main_keyboard(), parse_mode="Markdown")
 
-@dp.callback_query(CB.filter(F.action == "mark_broken"))
+@dp.callback_query(F.data == "mark_broken")
 async def ask_mark_broken(call: CallbackQuery):
     if not data["broken"]:
         await call.answer("Список поломок пуст.", show_alert=True)
@@ -206,9 +201,9 @@ async def ask_mark_broken(call: CallbackQuery):
     await call.message.edit_text("Выберите, что починено:", reply_markup=mark_keyboard("fix", data["broken"]))
     await call.answer()
 
-@dp.callback_query(CB.filter(F.action == "fix"))
-async def mark_fixed(call: CallbackQuery, callback_data: CB):
-    name = callback_data.value
+@dp.callback_query(F.data.startswith("fix:"))
+async def mark_fixed(call: CallbackQuery):
+    name = call.data.split(":", 1)[1]
     found = next((it for it in data["broken"] if it["name"] == name), None)
     if not found:
         await call.answer("Позиция не найдена.", show_alert=True)
@@ -228,7 +223,6 @@ async def mark_fixed(call: CallbackQuery, callback_data: CB):
 # ---------- Запуск ----------
 async def main():
     print("Бот «Сафонов» запущен.")
-    await bot.delete_webhook(drop_pending_updates=True)
     await dp.start_polling(bot, allowed_updates=["message", "callback_query"])
 
 if __name__ == "__main__":
