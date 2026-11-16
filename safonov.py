@@ -8,7 +8,7 @@ from aiogram.filters import Command
 from aiogram.filters.callback_data import CallbackData
 
 # ==================== НАСТРОЙКИ ====================
-BOT_TOKEN = "ВСТАВЬТЕ_ТОКЕН_САФОНОВА"
+BOT_TOKEN = "9135870925:AAHzYaEomgvs2OxvGgIJxHr6Pd0TkXV7z9Q"
 DATA_FILE = "safonov_data.json"
 TZ = timezone(timedelta(hours=7))  # МСК+4
 # ===================================================
