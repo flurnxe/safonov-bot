@@ -38,46 +38,42 @@ pending = {}
 def main_keyboard():
     return InlineKeyboardMarkup(inline_keyboard=[
         [InlineKeyboardButton(text="📋 Общий список", callback_data="all")],
-        [InlineKeyboardButton(text="🛒 Список покупок", callback_data="shop"),
-         InlineKeyboardButton(text="🔧 Список поломок", callback_data="broken")],
-        [InlineKeyboardButton(text="➕ Добавить покупку", callback_data="add_shop"),
-         InlineKeyboardButton(text="➕ Сообщить о поломке", callback_data="add_broken")],
+        [InlineKeyboardButton(text="🛒 Добавить покупку", callback_data="add_shop")],
+        [InlineKeyboardButton(text="🔧 Сообщить о поломке", callback_data="add_broken")],
     ])
 
-def list_keyboard(kind):
-    mark = "✅ Отметить купленное" if kind == "shop" else "✅ Отметить починенное"
-    act = "mark_shop" if kind == "shop" else "mark_broken"
+def list_keyboard():
     return InlineKeyboardMarkup(inline_keyboard=[
-        [InlineKeyboardButton(text=mark, callback_data=act)],
-        [InlineKeyboardButton(text="⬅️ В главное меню", callback_data="main")],
+        [InlineKeyboardButton(text="✅ Куплено", callback_data="mark_shop"),
+         InlineKeyboardButton(text="✅ Починено", callback_data="mark_broken")],
+        [InlineKeyboardButton(text="⬅️ Назад", callback_data="main")],
     ])
 
 def mark_keyboard(kind, items):
     kb, row = [], []
     for it in items:
-        row.append(InlineKeyboardButton(text=it["name"], callback_data=f"{kind}:{it['name']}"))
+        row.append(InlineKeyboardButton(text=f"• {it['name']}", callback_data=f"{kind}:{it['name']}"))
         if len(row) == 2:
             kb.append(row); row = []
     if row: kb.append(row)
-    kb.append([InlineKeyboardButton(text="⬅️ В главное меню", callback_data="main")])
+    kb.append([InlineKeyboardButton(text="⬅️ Назад", callback_data="main")])
     return InlineKeyboardMarkup(inline_keyboard=kb)
 
-def main_text():
-    return "🛠 **Панель закупок и поломок**\nВыберите действие:"
+def cancel_keyboard():
+    return InlineKeyboardMarkup(inline_keyboard=[
+        [InlineKeyboardButton(text="⬅️ Назад", callback_data="cancel_add")],
+    ])
 
-def format_list(kind):
-    if kind == "all":
-        t = "📋 **Общий список**\n\n🛒 **КУПИТЬ:**\n"
-        t += "\n".join(f"{i}. {it['name']}" for i, it in enumerate(data["shopping"], 1)) or "_пусто_"
-        t += "\n\n🔧 **ПОЧИНИТЬ:**\n"
-        t += "\n".join(f"{i}. {it['name']} (сообщил {it['user']}, {it['time']})" for i, it in enumerate(data["broken"], 1)) or "_пусто_"
-        return t
-    elif kind == "shop":
-        t = "🛒 **Список покупок**\n\n"
-        return t + ("\n".join(f"{i}. {it['name']}" for i, it in enumerate(data["shopping"], 1)) if data["shopping"] else "_Список пуст._")
-    else:
-        t = "🔧 **Список поломок**\n\n"
-        return t + ("\n".join(f"{i}. {it['name']} (сообщил {it['user']}, {it['time']})" for i, it in enumerate(data["broken"], 1)) if data["broken"] else "_Список пуст._")
+def main_text():
+    return "🛠 **Сафонов** — закупки и поломки\n\nВыберите действие:"
+
+def format_all():
+    t = "📋 **ОБЩИЙ СПИСОК**\n━━━━━━━━━━━━━━━\n\n"
+    t += "🛒 **КУПИТЬ:**\n"
+    t += "\n".join(f"{i}. {it['name']}" for i, it in enumerate(data["shopping"], 1)) or "_пусто_"
+    t += "\n\n🔧 **ПОЧИНИТЬ:**\n"
+    t += "\n".join(f"{i}. {it['name']} (сообщил {it['user']}, {it['time']})" for i, it in enumerate(data["broken"], 1)) or "_пусто_"
+    return t
 
 # ---------- Хэндлеры ----------
 @dp.message(Command("panel"))
@@ -96,33 +92,42 @@ async def go_main(call: CallbackQuery):
 
 @dp.callback_query(F.data == "all")
 async def show_all(call: CallbackQuery):
-    await call.message.edit_text(format_list("all"), reply_markup=InlineKeyboardMarkup(inline_keyboard=[
-        [InlineKeyboardButton(text="✅ Отметить купленное", callback_data="mark_shop")],
-        [InlineKeyboardButton(text="✅ Отметить починенное", callback_data="mark_broken")],
-        [InlineKeyboardButton(text="⬅️ В главное меню", callback_data="main")],
-    ]), parse_mode="Markdown")
-    await call.answer()
-
-@dp.callback_query(F.data == "shop")
-async def show_shop(call: CallbackQuery):
-    await call.message.edit_text(format_list("shop"), reply_markup=list_keyboard("shop"), parse_mode="Markdown")
-    await call.answer()
-
-@dp.callback_query(F.data == "broken")
-async def show_broken(call: CallbackQuery):
-    await call.message.edit_text(format_list("broken"), reply_markup=list_keyboard("broken"), parse_mode="Markdown")
+    await call.message.edit_text(format_all(), reply_markup=list_keyboard(), parse_mode="Markdown")
     await call.answer()
 
 @dp.callback_query(F.data == "add_shop")
 async def ask_add_shop(call: CallbackQuery):
-    msg = await call.message.answer("✍️ Напишите, что нужно купить, одним сообщением:")
+    msg = await call.message.answer(
+        "✍️ **Напишите название** одним сообщением:\n_например: салфетки_",
+        reply_markup=cancel_keyboard(),
+        parse_mode="Markdown"
+    )
     pending[call.from_user.id] = {"type": "shop", "prompt_msg_id": msg.message_id, "chat_id": call.message.chat.id, "panel_msg_id": call.message.message_id}
     await call.answer()
 
 @dp.callback_query(F.data == "add_broken")
 async def ask_add_broken(call: CallbackQuery):
-    msg = await call.message.answer("✍️ Напишите, что сломалось, одним сообщением:")
+    msg = await call.message.answer(
+        "✍️ **Напишите, что сломалось** одним сообщением:\n_например: колонка_",
+        reply_markup=cancel_keyboard(),
+        parse_mode="Markdown"
+    )
     pending[call.from_user.id] = {"type": "broken", "prompt_msg_id": msg.message_id, "chat_id": call.message.chat.id, "panel_msg_id": call.message.message_id}
+    await call.answer()
+
+@dp.callback_query(F.data == "cancel_add")
+async def cancel_add(call: CallbackQuery):
+    p = pending.pop(call.from_user.id, None)
+    if p:
+        try:
+            await bot.delete_message(p["chat_id"], p["prompt_msg_id"])
+        except Exception:
+            pass
+        try:
+            await bot.delete_message(p["chat_id"], p["panel_msg_id"])
+        except Exception:
+            pass
+    await call.message.answer(main_text(), reply_markup=main_keyboard(), parse_mode="Markdown")
     await call.answer()
 
 @dp.message(F.text)
@@ -171,7 +176,7 @@ async def ask_mark_shop(call: CallbackQuery):
     if not data["shopping"]:
         await call.answer("Список покупок пуст.", show_alert=True)
         return
-    await call.message.edit_text("Выберите, что куплено:", reply_markup=mark_keyboard("buy", data["shopping"]))
+    await call.message.edit_text("✅ **Что куплено?**", reply_markup=mark_keyboard("buy", data["shopping"]), parse_mode="Markdown")
     await call.answer()
 
 @dp.callback_query(F.data.startswith("buy:"))
@@ -198,7 +203,7 @@ async def ask_mark_broken(call: CallbackQuery):
     if not data["broken"]:
         await call.answer("Список поломок пуст.", show_alert=True)
         return
-    await call.message.edit_text("Выберите, что починено:", reply_markup=mark_keyboard("fix", data["broken"]))
+    await call.message.edit_text("✅ **Что починено?**", reply_markup=mark_keyboard("fix", data["broken"]), parse_mode="Markdown")
     await call.answer()
 
 @dp.callback_query(F.data.startswith("fix:"))
